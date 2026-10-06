@@ -28,6 +28,8 @@
 #define PR_WXSHADOW_DEL_BP      0x57580003
 #define PR_WXSHADOW_PATCH       0x57580006
 #define PR_WXSHADOW_RELEASE     0x57580008
+#define PR_WXSHADOW_ENABLE      0x57580009
+#define PR_WXSHADOW_STATUS      0x5758000a
 
 #define MAX_REG_MODS 4
 
@@ -48,6 +50,8 @@ static void print_usage(const char *prog) {
     printf("  %s -p <pid> -a <addr> --patch <hex>   Patch shadow page\n", prog);
     printf("  %s -p <pid> -a <addr> --release       Release modification at addr\n", prog);
     printf("  %s -p <pid> --release                 Release ALL shadows\n", prog);
+    printf("  %s --status                            Show enabled state\n", prog);
+    printf("  %s --enable                            Enable wxshadow (root only)\n", prog);
     printf("\nOptions:\n");
     printf("  -p, --pid <pid>       Target process ID (0 for self)\n");
     printf("  -a, --addr <addr>     Virtual address (hex, optional for -d/--release)\n");
@@ -320,6 +324,8 @@ int main(int argc, char *argv[]) {
         {"maps",    no_argument,       0, 'm'},
         {"patch",   required_argument, 0, 'P'},
         {"release", no_argument,       0, 'L'},
+        {"enable",  no_argument,       0, 'E'},
+        {"status",  no_argument,       0, 'S'},
         {"help",    no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
@@ -332,6 +338,8 @@ int main(int argc, char *argv[]) {
     int do_maps = 0;
     char *patch_hex = NULL;
     int do_release = 0;
+    int do_enable = 0;
+    int do_status = 0;
     struct reg_mod reg_mods[MAX_REG_MODS];
     int nr_reg_mods = 0;
 
@@ -383,6 +391,12 @@ int main(int argc, char *argv[]) {
         case 'L':
             do_release = 1;
             break;
+        case 'E':
+            do_enable = 1;
+            break;
+        case 'S':
+            do_status = 1;
+            break;
         case 'h':
             print_usage(argv[0]);
             return 0;
@@ -390,6 +404,25 @@ int main(int argc, char *argv[]) {
             print_usage(argv[0]);
             return 1;
         }
+    }
+
+    if (do_status) {
+        int status = prctl(PR_WXSHADOW_STATUS, 0, 0, 0, 0);
+        if (status < 0) {
+            perror("prctl(STATUS)");
+            return 1;
+        }
+        puts(status ? "enabled" : "disabled");
+        return 0;
+    }
+
+    if (do_enable) {
+        if (prctl(PR_WXSHADOW_ENABLE, 0, 0, 0, 0) < 0) {
+            perror("prctl(ENABLE)");
+            return 1;
+        }
+        puts("enabled");
+        return 0;
     }
 
     /* Show maps mode */

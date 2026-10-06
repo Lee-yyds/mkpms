@@ -24,6 +24,7 @@ mkdir build && cd build
 cmake -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc ..
 make wxshadow.kpm       # KPM 模块
 make wxshadow_client    # 用户态客户端
+make wxshadow_smoke     # 实机功能检查
 ```
 
 ## 文件结构
@@ -52,6 +53,8 @@ make wxshadow_client    # 用户态客户端
 | `PR_WXSHADOW_GET_TLB_MODE` | `0x57580005` | 获取当前 TLB flush 模式 |
 | `PR_WXSHADOW_PATCH` | `0x57580006` | 自定义 patch（copy_from_user 写入 shadow） |
 | `PR_WXSHADOW_RELEASE` | `0x57580008` | 释放 shadow，恢复原始页 |
+| `PR_WXSHADOW_ENABLE` | `0x57580009` | root 激活模块 |
+| `PR_WXSHADOW_STATUS` | `0x5758000a` | 查询启用状态 |
 
 ## 客户端用法
 
@@ -85,9 +88,35 @@ make wxshadow_client    # 用户态客户端
 
 # 释放所有 shadow
 ./wxshadow_client -p <pid> --release
+
+# 查看状态 / 激活（激活需要 root）
+./wxshadow_client --status
+./wxshadow_client --enable
 ```
 
-## 部署
+## SukiSU 普通模块（Pixel 6 / 5.10.214）
+
+此版本的 KPM 启动时默认停用。先将 `wxshadow.kpm` 以 `pre-kernel-init` 事件嵌入与设备匹配的 boot 镜像，再打包 SukiSU 普通模块；不要把含有设备验证材料的 boot 镜像上传到仓库。
+
+在项目根目录、编译完成后打包：
+
+```bash
+mkdir -p build/sukisu-module
+cp kpms/wxshadow/sukisu-module/{module.prop,post-fs-data.sh} build/sukisu-module/
+cp build/kpms/wxshadow/wxshadow_client build/sukisu-module/
+(cd build/sukisu-module && zip -0 ../wxshadow-sukisu-module.zip module.prop post-fs-data.sh wxshadow_client)
+```
+
+将 ZIP 安装到 SukiSU 后，普通模块开关在重启后生效：开启时 `post-fs-data.sh` 激活 KPM；关闭时 KPM 保持驻留，但 wxshadow 操作返回 `EACCES`。此 ZIP 不能独立替代匹配的 boot 镜像。
+
+设备上的验证命令：
+
+```bash
+su -c '/data/adb/modules/wxshadow/wxshadow_client --status'
+su -c '/data/local/tmp/wxshadow_smoke /data/adb/modules/wxshadow/wxshadow_client'
+```
+
+## 动态加载（仅适用于 KernelPatch 管理接口正常的设备）
 
 ```bash
 adb push build/kpms/wxshadow/wxshadow.kpm /data/local/tmp/
@@ -97,12 +126,17 @@ adb shell chmod +x /data/local/tmp/wxshadow_client
 # 加载模块（需要 KernelPatch superkey）
 kpatch <superkey> kpm load /data/local/tmp/wxshadow.kpm
 
+# KPM 默认停用，加载后需激活
+/data/local/tmp/wxshadow_client --enable
+
 # 查看日志
 dmesg | grep wxshadow
 
 # 卸载模块
 kpatch <superkey> kpm unload wxshadow
 ```
+
+本次实测的 Pixel 6 上，SukiSU/KPM 动态管理接口返回 `ENOTTY`，因此采用 boot 内嵌方式。
 
 ## 关键限制
 
@@ -123,4 +157,3 @@ kpatch <superkey> kpm unload wxshadow
 | `follow_page_pte` | hook (可选) | GUP 隐藏 |
 | `copy_process` | hook | fork 保护 |
 | `exit_mmap` | hook | 进程退出清理 |
-

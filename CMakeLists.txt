@@ -68,7 +68,7 @@ function(add_kpm_module MODULE_NAME)
 
 
     add_custom_target(${MODULE_NAME}.kpm ALL
-            COMMAND ${CMAKE_C_COMPILER} -r -o ${MODULE_NAME}.kpm "$<TARGET_OBJECTS:${MODULE_NAME}_obj>"
+            COMMAND ${CMAKE_LINKER} -r -o ${MODULE_NAME}.kpm "$<TARGET_OBJECTS:${MODULE_NAME}_obj>"
             DEPENDS ${MODULE_NAME}_obj
             COMMENT "Generating ${MODULE_NAME}.kpm"
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

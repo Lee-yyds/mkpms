@@ -1217,6 +1217,9 @@ int wxshadow_do_del_bp(void *mm, unsigned long addr)
 
 /* ========== prctl hook ========== */
 
+/* Boot-embedded KPM stays inert until the enabled SukiSU module activates it. */
+static atomic_t wxshadow_enabled = ATOMIC_INIT(0);
+
 /* Resolve pid to mm_struct. Returns mm with refcount held (caller must mmput). */
 static void *resolve_pid_to_mm(pid_t pid)
 {
@@ -1250,13 +1253,34 @@ void prctl_before(hook_fargs4_t *args, void *udata)
     pid_t pid;
 
     /* Only track wxshadow prctl calls for in-flight counting */
-    if (option < PR_WXSHADOW_SET_BP || option > PR_WXSHADOW_RELEASE)
+    if (option < PR_WXSHADOW_SET_BP || option > PR_WXSHADOW_STATUS)
         return;
 
     WX_HANDLER_ENTER();
 
+    if (option == PR_WXSHADOW_STATUS) {
+        args->ret = atomic_read(&wxshadow_enabled);
+        args->skip_origin = 1;
+        goto out;
+    }
+
+    if (option == PR_WXSHADOW_ENABLE) {
+        args->ret = current_uid() == 0 ? 0 : -EPERM;
+        if (args->ret == 0)
+            atomic_set(&wxshadow_enabled, 1);
+        args->skip_origin = 1;
+        goto out;
+    }
+
+    if (!atomic_read(&wxshadow_enabled)) {
+        args->ret = -EACCES;
+        args->skip_origin = 1;
+        goto out;
+    }
+
     /* Lazy scan mm->context.id offset on first wxshadow prctl call */
-    if (mm_context_id_offset < 0)
+    if (!kfunc_flush_tlb_page && !kfunc___flush_tlb_range &&
+        mm_context_id_offset < 0)
         try_scan_mm_context_id_offset();
 
     switch (option) {
@@ -1341,5 +1365,6 @@ void prctl_before(hook_fargs4_t *args, void *udata)
         break;
     }
 
+out:
     WX_HANDLER_EXIT();
 }

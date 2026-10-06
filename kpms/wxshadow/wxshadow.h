@@ -23,6 +23,8 @@
 #define PR_WXSHADOW_GET_TLB_MODE 0x57580005 /* WX + 5: Get TLB flush mode */
 #define PR_WXSHADOW_PATCH       0x57580006  /* WX + 6: Patch shadow page via kernel VA */
 #define PR_WXSHADOW_RELEASE     0x57580008  /* WX + 8: Release shadow */
+#define PR_WXSHADOW_ENABLE      0x57580009  /* Root-only activation */
+#define PR_WXSHADOW_STATUS      0x5758000a  /* 0=disabled, 1=enabled */
 
 /* TLB flush modes */
 enum wxshadow_tlb_mode {

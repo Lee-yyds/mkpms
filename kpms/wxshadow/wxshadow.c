@@ -1371,13 +1371,6 @@ static long wxshadow_init(const char *args, const char *event, void *__user rese
         return ret;
     }
 
-    /* Detect task_struct offsets */
-    ret = detect_task_struct_offsets();
-    if (ret < 0) {
-        pr_err("wxshadow: failed to detect task_struct offsets\n");
-        return ret;
-    }
-
     /* Only scan mm->context.id if we need TLBI instruction fallback */
     if (!kfunc_flush_tlb_page && !kfunc___flush_tlb_range) {
         pr_info("wxshadow: no kernel TLB flush function, need mm->context.id for TLBI\n");
@@ -1542,9 +1535,6 @@ static long wxshadow_init(const char *args, const char *event, void *__user rese
     } else {
         pr_info("wxshadow: GUP hiding DISABLED\n");
     }
-
-    /* Debug: print first 10 processes */
-    debug_print_tasks_list(10);
 
     return 0;
 }

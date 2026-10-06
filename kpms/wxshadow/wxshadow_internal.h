@@ -25,6 +25,7 @@
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
 #include <linux/err.h>
+#include <uapi/asm-generic/errno.h>
 
 #include <predata.h>
 #include "wxshadow.h"
